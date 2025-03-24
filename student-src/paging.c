@@ -37,6 +37,11 @@ void system_init(void) {
      * frames in memory. The frame table will be useful later if we need to
      * evict pages during page faults.
      */
+    frame_table->protected = 1; 
+    frame_table->mapped = 0;
+    frame_table->referenced = 0;
+    frame_table->process = NULL;
+    frame_table->vpn = 0;
 
 
     /*
