@@ -18,9 +18,9 @@
  * processes running on the system at any point in time.
  */
 typedef struct process {
-    uint32_t pid;
-    uint8_t state;
-    pfn_t saved_ptbr;
+    uint32_t pid;            //process ID 
+    uint8_t state;           //process state (running or stopped)
+    pfn_t saved_ptbr;        //saved page table base register (PTBR) for the process
 } pcb_t;
 
 /*

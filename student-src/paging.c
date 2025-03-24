@@ -37,12 +37,8 @@ void system_init(void) {
      * frames in memory. The frame table will be useful later if we need to
      * evict pages during page faults.
      */
-    frame_table->protected = 1; 
-    frame_table->mapped = 0;
-    frame_table->referenced = 0;
-    frame_table->process = NULL;
-    frame_table->vpn = 0;
-
+    frame_table = (fte_t *) &mem[0];
+    mem[0] = 0; // Zero out the memory at first frame.     
 
     /*
      * 2. Mark the first frame table entry as protected.
@@ -51,6 +47,13 @@ void system_init(void) {
      * however, there are some frames we never want to evict.
      * We mark these special pages as "protected" to indicate this.
      */
+
+    frame_table->protected = 1; 
+    frame_table->mapped = 0;
+    frame_table->referenced = 0;
+    frame_table->process = NULL;
+    frame_table->vpn = 0;
+     
 
 }
 
@@ -73,7 +76,8 @@ void proc_init(pcb_t *proc) {
      * 1. Call the free frame allocator (free_frame) to return a free frame for
      * this process's page table. You should zero-out the memory.
      */
-
+    pfn_t page_table_pfn = free_frame();
+    mem[page_table_pfn * PAGE_SIZE] = 0; // Zero out the memory for the page table
 
     /*
      * 2. Update the process's PCB with the frame number
@@ -82,6 +86,12 @@ void proc_init(pcb_t *proc) {
      * Additionally, mark the frame's frame table entry as protected. You do not
      * want your page table to be accidentally evicted.
      */
+    proc->ptbr = page_table_pfn; // Set the page table base register to the PFN
+    frame_table[page_table_pfn].protected = 1; // Mark the page table as protected
+    frame_table[page_table_pfn].mapped = 1; // Mark the page table as mapped
+    frame_table[page_table_pfn].referenced = 0; // Set referenced bit to 0
+    frame_table[page_table_pfn].process = proc; // Set the process that owns this page table
+    frame_table[page_table_pfn].vpn = 0; // Set the VPN to 0 since this is the page table
 
 }
 
