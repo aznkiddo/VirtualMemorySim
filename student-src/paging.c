@@ -71,13 +71,15 @@ void system_init(void) {
         in the frame_table as protected after we allocate memory for our page table.
     -----------------------------------------------------------------------------------
 */
-void proc_init(pcb_t *proc) {
-    /*
+void proc_init(pcb_t *proc) {//pcn is a process control block 
+    /* 
      * 1. Call the free frame allocator (free_frame) to return a free frame for
      * this process's page table. You should zero-out the memory.
      */
-    pfn_t page_table_pfn = free_frame();
-    mem[page_table_pfn * PAGE_SIZE] = 0; // Zero out the memory for the page table
+    pfn_t page_table_pfn = free_frame(); //pfn is a physical frame number
+    //mem[page_table_pfn * PAGE_SIZE] = 0; // Zero out the memory for the page table
+    memset(mem + (page_table_pfn * PAGE_SIZE), 0, PAGE_SIZE);
+
 
     /*
      * 2. Update the process's PCB with the frame number
@@ -86,9 +88,9 @@ void proc_init(pcb_t *proc) {
      * Additionally, mark the frame's frame table entry as protected. You do not
      * want your page table to be accidentally evicted.
      */
-    proc->ptbr = page_table_pfn; // Set the page table base register to the PFN
+    proc->saved_ptbr = page_table_pfn; // Set the page table base register to the PFN
     frame_table[page_table_pfn].protected = 1; // Mark the page table as protected
-    frame_table[page_table_pfn].mapped = 1; // Mark the page table as mapped
+    frame_table[page_table_pfn].mapped = 1; // Mark the page table as mapped to prevent reuse by another process. 
     frame_table[page_table_pfn].referenced = 0; // Set referenced bit to 0
     frame_table[page_table_pfn].process = proc; // Set the process that owns this page table
     frame_table[page_table_pfn].vpn = 0; // Set the VPN to 0 since this is the page table
@@ -107,6 +109,12 @@ void proc_init(pcb_t *proc) {
     -----------------------------------------------------------------------------------
  */
 void context_switch(pcb_t *proc) {
+    proc->state = PROC_RUNNING; // Set the new process to running
+    current_process->state = PROC_STOPPED; // Set the old process to stopped
+    PTBR = proc->saved_ptbr; // Set the page table base register to the new process's page table
+    current_process = proc; // Update the current process to the new one
+    //TODO: Increment the context switch count
+    
 
 }
 
@@ -143,12 +151,20 @@ uint8_t mem_access(vaddr_t address, char rw, uint8_t data) {
 
 
     /* Split the address and find the page table entry */
+    vpn_t vpn = vaddr_vpn(address); // Get the virtual page number
+    uint16_t offset = vaddr_offset(address); // Get the offset into the page
+    pte_t *page_table = (pte_t *) &mem[PTBR * PAGE_SIZE]; // Get the page table from memory
+    pte_t *entry = &page_table[vpn]; // Get the page table entry for the virtual page number
 
 
     /* If an entry is invalid, just page fault to allocate a page for the page table. */
-
+    if (!entry->valid) {
+        page_fault(address); // Call the page fault handler to allocate a page
+        entry = &page_table[vpn]; // Get the page table entry again after the page fault
+    }
 
     /* Set the "referenced" bit to reduce the page's likelihood of eviction */
+    frame_table[entry->pfn].referenced = 1; // Set the referenced bit in the frame table entry
 
 
     /*
@@ -162,13 +178,26 @@ uint8_t mem_access(vaddr_t address, char rw, uint8_t data) {
         Create the physical address using your offset and the page
         table entry.
     */
+    pfn_t pfn = entry->pfn; // Get the physical frame number from the page table entry
+    paddr_t paddr = (pfn << OFFSET_LEN) | offset; // Create the physical address
+    //mem access
+
+
 
 
     /* Either read or write the data to the physical address
        depending on 'rw' */
     if (rw == 'r') {
-
+        stats.reads++; // Increment the read count in the stats
+        stats.accesses++; // Increment the access count in the stats
+        return mem[paddr]; // Return the data at the physical address if it's a read
+        
     } else {
+        stats.writes++; // Increment the write count in the stats
+        stats.accesses++;
+        mem[paddr] = data; // Write the data to the physical address if it's a write
+        entry->dirty = 1; // Set the dirty bit in the page table entry since we wrote to it
+        return data; // Return the data we just wrote
 
     }
 }
@@ -190,7 +219,7 @@ void proc_cleanup(pcb_t *proc) {
 
     /* Iterate the page table and clean up each valid page */
     for (size_t i = 0; i < NUM_PAGES; i++) {
-
+        
     }
 
     /* Free the page table itself in the frame table */

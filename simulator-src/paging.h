@@ -45,9 +45,9 @@ typedef struct ft_entry {
     uint8_t protected;          /* 1 if the frame holds a page table and is
                                    immune from eviction, 0 otherwise */
     /* -- Used for data pages -- */
-    uint8_t mapped;             /* 1 if the frame is mapped, 0
-                                   otherwise */
-    uint8_t referenced;         /* 1 if the entry has been recently
+    uint8_t mapped;             /*AKA IN USE 1 if the frame is mapped, 0
+                                   otherwise */ 
+    uint8_t referenced;         /* page replacement reasons 1 if the entry has been recently
                                    used, 0 otherwise */
     pcb_t *process;             /* A pointer to the owning process's PCB */
     vpn_t vpn;                  /* The VPN mapped by the process using this frame. */
