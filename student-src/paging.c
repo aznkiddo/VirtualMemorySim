@@ -159,6 +159,7 @@ uint8_t mem_access(vaddr_t address, char rw, uint8_t data) {
 
     /* If an entry is invalid, just page fault to allocate a page for the page table. */
     if (!entry->valid) {
+        //stats.page_faults++; // Increment the page fault count in the stats
         page_fault(address); // Call the page fault handler to allocate a page
         entry = &page_table[vpn]; // Get the page table entry again after the page fault
     }
