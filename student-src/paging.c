@@ -159,7 +159,7 @@ uint8_t mem_access(vaddr_t address, char rw, uint8_t data) {
 
     /* If an entry is invalid, just page fault to allocate a page for the page table. */
     if (!entry->valid) {
-        //stats.page_faults++; // Increment the page fault count in the stats
+        //stats.page_faults++; // already incremented in page_fault method. 
         page_fault(address); // Call the page fault handler to allocate a page
         entry = &page_table[vpn]; // Get the page table entry again after the page fault
     }
@@ -188,14 +188,15 @@ uint8_t mem_access(vaddr_t address, char rw, uint8_t data) {
 
     /* Either read or write the data to the physical address
        depending on 'rw' */
+       stats.accesses++; 
     if (rw == 'r') {
-        stats.reads++; // Increment the read count in the stats
-        stats.accesses++; // Increment the access count in the stats
+        stats.reads++; 
+        
         return mem[paddr]; // Return the data at the physical address if it's a read
         
     } else {
-        stats.writes++; // Increment the write count in the stats
-        stats.accesses++;
+        stats.writes++; 
+        
         mem[paddr] = data; // Write the data to the physical address if it's a write
         entry->dirty = 1; // Set the dirty bit in the page table entry since we wrote to it
         return data; // Return the data we just wrote
@@ -217,12 +218,31 @@ uint8_t mem_access(vaddr_t address, char rw, uint8_t data) {
 */
 void proc_cleanup(pcb_t *proc) {
     /* Look up the process's page table */
+    pte_t *page_table = (pte_t *) &mem[proc->saved_ptbr * PAGE_SIZE];
+    /* Clear the protected bit for the page table itself */
+    frame_table[proc->saved_ptbr].protected = 0;
+    
+    
+
 
     /* Iterate the page table and clean up each valid page */
     for (size_t i = 0; i < NUM_PAGES; i++) {
-        
+        if (page_table[i].valid) {
+            
+            if (page_table[i].dirty) { //write back to disk if dirty 
+                swap_write(&page_table[i].swap, &mem[page_table[i].pfn * PAGE_SIZE]);
+                stats.writebacks++;
+            }
+            frame_table[page_table[i].pfn].mapped = 0;
+            swap_free(&page_table[i].swap);
+            page_table[i].valid = 0;
+            page_table[i].dirty = 0;
+        }
     }
 
     /* Free the page table itself in the frame table */
-
+    frame_table[proc->saved_ptbr].mapped = 0; 
+    frame_table[proc->saved_ptbr].referenced = 0; 
+    frame_table[proc->saved_ptbr].process = NULL; 
+    frame_table[proc->saved_ptbr].vpn = 0; 
 }
