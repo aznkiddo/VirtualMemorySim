@@ -40,14 +40,18 @@ pfn_t free_frame(void) {
         if (frame_table[victim_pfn].mapped) {
             pcb_t *proc = frame_table[victim_pfn].process;
             pte_t *page_table = (pte_t *) &mem[proc->saved_ptbr * PAGE_SIZE];
-            if (page_table->dirty) {
-                /* Write the dirty page to disk */
-                swap_write(&page_table->swap, &mem[victim_pfn * PAGE_SIZE]);
+            pte_t *entry = &page_table[frame_table[victim_pfn].vpn]; // Get correct page table entry
+    
+            /* If the page is dirty, write to swap */
+            if (entry->dirty) {
+                swap_write(entry, &mem[victim_pfn * PAGE_SIZE]);
                 stats.writebacks++;
             }
-            page_table->valid = 0; 
-            page_table->dirty = 0;
-
+    
+            /* Mark the original page table entry as invalid */
+            frame_table[victim_pfn].mapped = 0; // Mark the frame as free
+            entry->valid = 0;
+            entry->dirty = 0;
         }
 
     /* Return the pfn */

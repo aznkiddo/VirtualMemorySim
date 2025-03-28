@@ -38,7 +38,7 @@ void system_init(void) {
      * evict pages during page faults.
      */
     frame_table = (fte_t *) &mem[0];
-    mem[0] = 0; // Zero out the memory at first frame.     
+    memset(frame_table, 0, NUM_FRAMES * sizeof(fte_t)); // Zero out the frame table
 
     /*
      * 2. Mark the first frame table entry as protected.
@@ -48,13 +48,7 @@ void system_init(void) {
      * We mark these special pages as "protected" to indicate this.
      */
 
-    frame_table->protected = 1; 
-    frame_table->mapped = 0;
-    frame_table->referenced = 0;
-    frame_table->process = NULL;
-    frame_table->vpn = 0;
-     
-
+    frame_table[0].protected = 1; // Mark the first frame as protected
 }
 
 /*  --------------------------------- PROBLEM 3 --------------------------------------
@@ -93,7 +87,7 @@ void proc_init(pcb_t *proc) {//pcn is a process control block
     frame_table[page_table_pfn].mapped = 1; // Mark the page table as mapped to prevent reuse by another process. 
     frame_table[page_table_pfn].referenced = 0; // Set referenced bit to 0
     frame_table[page_table_pfn].process = proc; // Set the process that owns this page table
-    frame_table[page_table_pfn].vpn = 0; // Set the VPN to 0 since this is the page table
+    proc->state = PROC_RUNNING;
 
 }
 
@@ -109,13 +103,12 @@ void proc_init(pcb_t *proc) {//pcn is a process control block
     -----------------------------------------------------------------------------------
  */
 void context_switch(pcb_t *proc) {
-    proc->state = PROC_RUNNING; // Set the new process to running
-    current_process->state = PROC_STOPPED; // Set the old process to stopped
+    // proc->state = PROC_RUNNING; // Set the new process to running
+    // if (current_process)
+    //     current_process->state = PROC_STO; // Set the old process to stopped
     PTBR = proc->saved_ptbr; // Set the page table base register to the new process's page table
     current_process = proc; // Update the current process to the new one
     //TODO: Increment the context switch count
-    
-
 }
 
 /*  --------------------------------- PROBLEM 5 --------------------------------------
@@ -182,10 +175,6 @@ uint8_t mem_access(vaddr_t address, char rw, uint8_t data) {
     pfn_t pfn = entry->pfn; // Get the physical frame number from the page table entry
     paddr_t paddr = (pfn << OFFSET_LEN) | offset; // Create the physical address
     //mem access
-
-
-
-
     /* Either read or write the data to the physical address
        depending on 'rw' */
        stats.accesses++; 
@@ -228,13 +217,12 @@ void proc_cleanup(pcb_t *proc) {
     /* Iterate the page table and clean up each valid page */
     for (size_t i = 0; i < NUM_PAGES; i++) {
         if (page_table[i].valid) {
-            
-            if (page_table[i].dirty) { //write back to disk if dirty 
-                swap_write(&page_table[i].swap, &mem[page_table[i].pfn * PAGE_SIZE]);
-                stats.writebacks++;
-            }
             frame_table[page_table[i].pfn].mapped = 0;
-            swap_free(&page_table[i].swap);
+            
+            if (swap_exists(&page_table[i])) { //check if swap exists
+                swap_free(&page_table[i]); //free the swap entry
+            }
+
             page_table[i].valid = 0;
             page_table[i].dirty = 0;
         }
