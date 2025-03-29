@@ -45,6 +45,7 @@ pfn_t free_frame(void) {
             /* If the page is dirty, write to swap */
             if (entry->dirty) {
                 swap_write(entry, &mem[victim_pfn * PAGE_SIZE]);
+                entry->dirty = 0;
                 stats.writebacks++;
             }
     

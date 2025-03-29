@@ -103,7 +103,7 @@ void proc_init(pcb_t *proc) {//pcn is a process control block
     -----------------------------------------------------------------------------------
  */
 void context_switch(pcb_t *proc) {
-    // proc->state = PROC_RUNNING; // Set the new process to running
+    proc->state = PROC_RUNNING; // Set the new process to running
     // if (current_process)
     //     current_process->state = PROC_STO; // Set the old process to stopped
     PTBR = proc->saved_ptbr; // Set the page table base register to the new process's page table
@@ -216,19 +216,19 @@ void proc_cleanup(pcb_t *proc) {
 
     /* Iterate the page table and clean up each valid page */
     for (size_t i = 0; i < NUM_PAGES; i++) {
-        if (page_table[i].valid) {
-            frame_table[page_table[i].pfn].mapped = 0;
-            
-            if (swap_exists(&page_table[i])) { //check if swap exists
-                swap_free(&page_table[i]); //free the swap entry
-            }
-
-            page_table[i].valid = 0;
-            page_table[i].dirty = 0;
+        pte_t *entry = &page_table[i]; // Get the page table entry
+        if (swap_exists(entry)) { //check if swap exists
+            swap_free(entry); //free the swap entry
+        }
+        if (entry->valid) {
+            frame_table[entry->pfn].mapped = 0;
+            entry->valid = 0;
         }
     }
+ 
 
     /* Free the page table itself in the frame table */
+
     frame_table[proc->saved_ptbr].mapped = 0; 
     frame_table[proc->saved_ptbr].referenced = 0; 
     frame_table[proc->saved_ptbr].process = NULL; 
